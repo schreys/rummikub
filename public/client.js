@@ -671,6 +671,39 @@
   $("btn-leave-lobby").onclick = leave;
   $("btn-leave-game").onclick = leave;
 
+  // ---------- fullscreen ----------
+
+  const root = document.documentElement;
+  const requestFs = root.requestFullscreen || root.webkitRequestFullscreen;
+  const exitFs = document.exitFullscreen || document.webkitExitFullscreen;
+  const isFullscreen = () =>
+    !!(document.fullscreenElement || document.webkitFullscreenElement);
+
+  function updateFullscreenButtons() {
+    for (const b of document.querySelectorAll(".btn-fullscreen")) {
+      b.classList.toggle("hidden", !requestFs);
+      b.textContent = isFullscreen() ? "Volledig scherm uit" : "Volledig scherm";
+    }
+  }
+
+  async function toggleFullscreen() {
+    try {
+      if (isFullscreen()) return await exitFs.call(document);
+      await requestFs.call(root);
+      // Orientation lock only works in fullscreen and isn't supported everywhere (e.g. iOS).
+      screen.orientation?.lock?.("landscape")?.catch(() => {});
+    } catch {
+      toast("Volledig scherm wordt niet ondersteund in deze browser.", true);
+    }
+  }
+
+  for (const b of document.querySelectorAll(".btn-fullscreen")) {
+    b.onclick = toggleFullscreen;
+  }
+  document.addEventListener("fullscreenchange", updateFullscreenButtons);
+  document.addEventListener("webkitfullscreenchange", updateFullscreenButtons);
+  updateFullscreenButtons();
+
   $("btn-copy").onclick = async () => {
     const link = `${location.origin}/?room=${S.room.code}`;
     try {

@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rummikub online</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <section id="screen-home" class="screen">
+    <div class="card home-card">
+      <h1>Rummi<span class="r">k</span><span class="b">u</span><span class="o">b</span></h1>
+      <p class="subtitle">Speel online met vrienden of tegen bots</p>
+      <label>Je naam
+        <input id="name" maxlength="20" autocomplete="nickname" placeholder="Bijv. Stefan">
+      </label>
+      <button id="btn-create" class="primary">Nieuw spel maken</button>
+      <div class="divider">of doe mee met een code</div>
+      <div class="row">
+        <input id="code" maxlength="5" placeholder="CODE" class="code-input">
+        <button id="btn-join">Meedoen</button>
+      </div>
+      <p id="home-error" class="error"></p>
+    </div>
+  </section>
+
+  <section id="screen-room" class="screen hidden">
+    <div id="room-main">
+      <div id="lobby" class="hidden">
+        <div class="card">
+          <h2>Wachtkamer</h2>
+          <p>Spelcode: <strong id="lobby-code" class="code"></strong>
+            <button id="btn-copy" class="small">Kopieer uitnodigingslink</button></p>
+          <ul id="lobby-players" class="player-list"></ul>
+          <div id="host-controls">
+            <button id="btn-add-bot">+ Bot toevoegen</button>
+            <label>Beurttijd
+              <select id="timer-select"></select>
+            </label>
+            <button id="btn-start" class="primary">Start spel</button>
+          </div>
+          <p id="lobby-wait" class="muted">Wachten tot de host het spel start…</p>
+          <p id="lobby-error" class="error"></p>
+          <button id="btn-leave-lobby" class="link">Wachtkamer verlaten</button>
+        </div>
+      </div>
+
+      <div id="game" class="hidden">
+        <header id="game-header">
+          <div id="players-bar"></div>
+          <div id="game-info">
+            <span id="pool-count"></span>
+            <span id="turn-timer"></span>
+          </div>
+        </header>
+        <div id="timer-bar"><div id="timer-fill"></div></div>
+        <div id="board-wrap">
+          <div id="board"></div>
+        </div>
+        <div id="status-line"></div>
+        <div id="controls">
+          <button id="btn-play" class="primary">Beurt beëindigen</button>
+          <button id="btn-draw">Steen pakken</button>
+          <button id="btn-reset">Herstel</button>
+          <button id="btn-show-result" class="primary hidden">Uitslag</button>
+          <span class="spacer"></span>
+          <button id="btn-sort-num" class="small" title="Sorteer op getal">777</button>
+          <button id="btn-sort-color" class="small" title="Sorteer op kleur">789</button>
+          <button id="btn-leave-game" class="small link">Verlaten</button>
+        </div>
+        <div id="rack"></div>
+      </div>
+    </div>
+
+    <aside id="chat">
+      <h3>Chat</h3>
+      <div id="chat-log"></div>
+      <form id="chat-form" autocomplete="off">
+        <input id="chat-input" maxlength="300" placeholder="Typ een bericht…">
+        <button type="submit">Stuur</button>
+      </form>
+    </aside>
+  </section>
+
+  <div id="result" class="overlay hidden">
+    <div class="card">
+      <h2 id="result-title"></h2>
+      <table id="result-table">
+        <thead><tr><th>Speler</th><th>Over</th><th>Ronde</th><th>Totaal</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <button id="btn-new-round" class="primary">Nieuwe ronde</button>
+      <p id="result-wait" class="muted">Wachten tot de host een nieuwe ronde start…</p>
+      <button id="btn-view-board" class="link">Bord bekijken</button>
+    </div>
+  </div>
+
+  <div id="toast" class="hidden"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="rules.js"></script>
+  <script src="client.js"></script>
+</body>
+</html>

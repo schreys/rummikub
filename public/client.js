@@ -1,8 +1,8 @@
 (() => {
   const socket = io();
   const $ = (id) => document.getElementById(id);
-  const SESSION_KEY = 'rummikub-session';
-  const NAME_KEY = 'rummikub-name';
+  const SESSION_KEY = "rummikub-session";
+  const NAME_KEY = "rummikub-name";
   const COLOR_ORDER = { red: 0, blue: 1, orange: 2, black: 3, joker: 4 };
 
   const S = {
@@ -64,38 +64,38 @@
 
   let toastTimer;
   function toast(text, isError = false) {
-    const t = $('toast');
+    const t = $("toast");
     t.textContent = text;
-    t.className = isError ? 'err' : '';
+    t.className = isError ? "err" : "";
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => t.classList.add('hidden'), 3200);
+    toastTimer = setTimeout(() => t.classList.add("hidden"), 3200);
   }
 
   function showScreen(name) {
-    $('screen-home').classList.toggle('hidden', name !== 'home');
-    $('screen-room').classList.toggle('hidden', name !== 'room');
-    if (name === 'home') $('result').classList.add('hidden');
+    $("screen-home").classList.toggle("hidden", name !== "home");
+    $("screen-room").classList.toggle("hidden", name !== "room");
+    if (name === "home") $("result").classList.add("hidden");
   }
 
   function goHome() {
     clearSession();
     S.room = null;
     S.turnKey = null;
-    showScreen('home');
-    history.replaceState(null, '', '/');
+    showScreen("home");
+    history.replaceState(null, "", "/");
   }
 
   // ---------- home ----------
 
-  $('name').value = localStorage.getItem(NAME_KEY) || '';
-  const urlRoom = new URLSearchParams(location.search).get('room');
-  if (urlRoom) $('code').value = urlRoom.toUpperCase();
+  $("name").value = localStorage.getItem(NAME_KEY) || "";
+  const urlRoom = new URLSearchParams(location.search).get("room");
+  if (urlRoom) $("code").value = urlRoom.toUpperCase();
 
   function getName() {
-    const name = $('name').value.trim();
+    const name = $("name").value.trim();
     if (!name) {
-      $('home-error').textContent = 'Vul eerst je naam in.';
-      $('name').focus();
+      $("home-error").textContent = "Vul eerst je naam in.";
+      $("name").focus();
       return null;
     }
     localStorage.setItem(NAME_KEY, name);
@@ -104,55 +104,63 @@
 
   function onJoined(res) {
     if (!res.ok) {
-      $('home-error').textContent = res.error;
+      $("home-error").textContent = res.error;
       return;
     }
-    $('home-error').textContent = '';
+    $("home-error").textContent = "";
     saveSession({ code: res.code, token: res.token });
-    history.replaceState(null, '', `/?room=${res.code}`);
+    history.replaceState(null, "", `/?room=${res.code}`);
   }
 
-  $('btn-create').onclick = () => {
+  $("btn-create").onclick = () => {
     const name = getName();
-    if (name) socket.emit('createRoom', { name }, onJoined);
+    if (name) socket.emit("createRoom", { name }, onJoined);
   };
-  $('btn-join').onclick = () => {
+  $("btn-join").onclick = () => {
     const name = getName();
-    const code = $('code').value.trim().toUpperCase();
+    const code = $("code").value.trim().toUpperCase();
     if (!name) return;
     if (code.length !== 5) {
-      $('home-error').textContent = 'Vul een geldige code van 5 tekens in.';
+      $("home-error").textContent = "Vul een geldige code van 5 tekens in.";
       return;
     }
-    socket.emit('joinRoom', { code, name }, onJoined);
+    socket.emit("joinRoom", { code, name }, onJoined);
   };
-  $('code').addEventListener('keydown', (e) => e.key === 'Enter' && $('btn-join').click());
-  $('name').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') ($('code').value.trim() ? $('btn-join') : $('btn-create')).click();
+  $("code").addEventListener(
+    "keydown",
+    (e) => e.key === "Enter" && $("btn-join").click(),
+  );
+  $("name").addEventListener("keydown", (e) => {
+    if (e.key === "Enter")
+      ($("code").value.trim() ? $("btn-join") : $("btn-create")).click();
   });
 
-  socket.on('connect', () => {
+  socket.on("connect", () => {
     if (!S.session) return;
-    socket.emit('joinRoom', { code: S.session.code, token: S.session.token }, (res) => {
-      if (!res.ok) {
-        goHome();
-        toast(res.error, true);
-      }
-    });
+    socket.emit(
+      "joinRoom",
+      { code: S.session.code, token: S.session.token },
+      (res) => {
+        if (!res.ok) {
+          goHome();
+          toast(res.error, true);
+        }
+      },
+    );
   });
 
-  socket.on('kicked', ({ reason }) => {
+  socket.on("kicked", ({ reason }) => {
     goHome();
     toast(reason, true);
   });
 
   // ---------- room state ----------
 
-  socket.on('room', (state) => {
+  socket.on("room", (state) => {
     S.room = state;
     const g = state.game;
     if (g) syncGame(state, g);
-    showScreen('room');
+    showScreen("room");
     render();
   });
 
@@ -165,7 +173,7 @@
     if (!(isMyTurn() && key === S.turnKey)) {
       S.board = g.board.map((set) => set.map((t) => t.id));
       if (newRound) {
-        S.rack = sortIds(serverRack, 'color');
+        S.rack = sortIds(serverRack, "color");
         S.newDraws = new Set();
         S.resultDismissed = null;
       } else {
@@ -181,10 +189,11 @@
     }
     S.turnKey = key;
     S.round = state.round;
-    S.deadline = g.turnRemainingMs != null ? Date.now() + g.turnRemainingMs : null;
+    S.deadline =
+      g.turnRemainingMs != null ? Date.now() + g.turnRemainingMs : null;
   }
 
-  socket.on('preview', (data) => {
+  socket.on("preview", (data) => {
     const g = game();
     if (!g || isMyTurn() || data.turnNumber !== g.turnNumber) return;
     S.preview = data.board;
@@ -196,8 +205,13 @@
       const ta = tile(a);
       const tb = tile(b);
       if (ta.joker !== tb.joker) return ta.joker ? 1 : -1;
-      if (mode === 'number') return ta.number - tb.number || COLOR_ORDER[ta.color] - COLOR_ORDER[tb.color];
-      return COLOR_ORDER[ta.color] - COLOR_ORDER[tb.color] || ta.number - tb.number;
+      if (mode === "number")
+        return (
+          ta.number - tb.number || COLOR_ORDER[ta.color] - COLOR_ORDER[tb.color]
+        );
+      return (
+        COLOR_ORDER[ta.color] - COLOR_ORDER[tb.color] || ta.number - tb.number
+      );
     });
   }
 
@@ -205,8 +219,8 @@
 
   function render() {
     const g = game();
-    $('lobby').classList.toggle('hidden', !!g);
-    $('game').classList.toggle('hidden', !g);
+    $("lobby").classList.toggle("hidden", !!g);
+    $("game").classList.toggle("hidden", !g);
     if (!g) return renderLobby();
     renderGame();
   }
@@ -214,31 +228,41 @@
   function renderLobby() {
     const r = S.room;
     const isHost = r.hostId === me();
-    $('lobby-code').textContent = r.code;
-    const list = $('lobby-players');
+    $("lobby-code").textContent = r.code;
+    const list = $("lobby-players");
     list.replaceChildren();
     for (const p of r.players) {
-      const li = el('li', p.connected ? '' : 'offline');
-      li.append(el('span', 'name', p.name + (p.id === me() ? ' (jij)' : '')));
-      if (p.id === r.hostId) li.append(el('span', 'badge host', 'host'));
-      if (p.isBot) li.append(el('span', 'badge', 'bot'));
-      if (!p.connected) li.append(el('span', 'badge', 'offline'));
+      const li = el("li", p.connected ? "" : "offline");
+      li.append(el("span", "name", p.name + (p.id === me() ? " (jij)" : "")));
+      if (p.id === r.hostId) li.append(el("span", "badge host", "host"));
+      if (p.isBot) li.append(el("span", "badge", "bot"));
+      if (!p.connected) li.append(el("span", "badge", "offline"));
       if (isHost && p.id !== me()) {
-        const rm = el('button', 'small', 'Verwijder');
-        rm.onclick = () => socket.emit('removePlayer', { playerId: p.id }, (res) => !res.ok && toast(res.error, true));
+        const rm = el("button", "small", "Verwijder");
+        rm.onclick = () =>
+          socket.emit(
+            "removePlayer",
+            { playerId: p.id },
+            (res) => !res.ok && toast(res.error, true),
+          );
         li.append(rm);
       }
       list.append(li);
     }
-    for (let i = r.players.length; i < r.maxPlayers; i++) list.append(el('li', 'offline', 'Vrije plek'));
+    for (let i = r.players.length; i < r.maxPlayers; i++)
+      list.append(el("li", "offline", "Vrije plek"));
 
-    $('host-controls').classList.toggle('hidden', !isHost);
-    $('lobby-wait').classList.toggle('hidden', isHost);
-    $('btn-add-bot').disabled = r.players.length >= r.maxPlayers;
-    $('btn-start').disabled = r.players.length < 2;
-    const sel = $('timer-select');
+    $("host-controls").classList.toggle("hidden", !isHost);
+    $("lobby-wait").classList.toggle("hidden", isHost);
+    $("btn-add-bot").disabled = r.players.length >= r.maxPlayers;
+    $("btn-start").disabled = r.players.length < 2;
+    const sel = $("timer-select");
     if (sel.options.length !== r.timerOptions.length) {
-      sel.replaceChildren(...r.timerOptions.map((s) => new Option(s ? `${s} seconden` : 'Geen limiet', s)));
+      sel.replaceChildren(
+        ...r.timerOptions.map(
+          (s) => new Option(s ? `${s} seconden` : "Geen limiet", s),
+        ),
+      );
     }
     sel.value = r.settings.turnSeconds;
   }
@@ -253,26 +277,37 @@
 
   function renderPlayers() {
     const g = game();
-    const bar = $('players-bar');
+    const bar = $("players-bar");
     bar.replaceChildren();
     for (const gp of g.players) {
-      const p = roomPlayer(gp.id) || { name: '?', score: 0 };
-      const chip = el('div', 'pchip');
-      if (!g.finished && gp.id === g.currentPlayerId) chip.classList.add('turn');
-      if (gp.id === me()) chip.classList.add('me');
-      if (p.connected === false) chip.classList.add('offline');
-      chip.append(el('span', 'pname', p.name));
-      if (p.isBot) chip.append(el('span', 'badge', 'bot'));
-      chip.append(el('span', 'count', gp.rackCount));
-      chip.title = gp.hasMelded ? 'Heeft uitgelegd' : 'Nog niet uitgelegd';
-      chip.append(el('span', 'score', `${p.score} pt${gp.hasMelded ? '' : ' · nog niet uitgelegd'}`));
+      const p = roomPlayer(gp.id) || { name: "?", score: 0 };
+      const chip = el("div", "pchip");
+      if (!g.finished && gp.id === g.currentPlayerId)
+        chip.classList.add("turn");
+      if (gp.id === me()) chip.classList.add("me");
+      if (p.connected === false) chip.classList.add("offline");
+      chip.append(el("span", "pname", p.name));
+      if (p.isBot) chip.append(el("span", "badge", "bot"));
+      chip.append(el("span", "count", gp.rackCount));
+      chip.title = gp.hasMelded ? "Heeft uitgelegd" : "Nog niet uitgelegd";
+      chip.append(
+        el(
+          "span",
+          "score",
+          `${p.score} pt${gp.hasMelded ? "" : " · nog niet uitgelegd"}`,
+        ),
+      );
       bar.append(chip);
     }
-    $('pool-count').textContent = `Pot: ${g.poolCount}`;
+    $("pool-count").textContent = `Pot: ${g.poolCount}`;
   }
 
   function tileEl(t) {
-    const e = el('div', `tile ${t.joker ? 'joker' : t.color}`, t.joker ? '☺' : String(t.number));
+    const e = el(
+      "div",
+      `tile ${t.joker ? "joker" : t.color}`,
+      t.joker ? "☺" : String(t.number),
+    );
     e.dataset.id = t.id;
     return e;
   }
@@ -280,7 +315,7 @@
   function renderBoard() {
     const g = game();
     if (!g) return;
-    const board = $('board');
+    const board = $("board");
     board.replaceChildren();
     const mine = isMyTurn();
     const preview = !mine && !g.finished && S.preview;
@@ -291,44 +326,60 @@
     const committed = new Set(g.board.flat().map((t) => t.id));
 
     sets.forEach((set, idx) => {
-      const div = el('div', 'set');
+      const div = el("div", "set");
       div.dataset.index = idx;
-      if (!Rules.analyzeSet(set)) div.classList.add('invalid');
+      if (!Rules.analyzeSet(set)) div.classList.add("invalid");
       for (const t of set) {
         const te = tileEl(t);
         if (mine) {
-          if (isFresh(t.id)) te.classList.add('fresh');
-          if (g.hasMelded || isFresh(t.id)) te.classList.add('draggable');
+          if (isFresh(t.id)) te.classList.add("fresh");
+          if (g.hasMelded || isFresh(t.id)) te.classList.add("draggable");
         } else if (preview && !committed.has(t.id)) {
-          te.classList.add('fresh');
+          te.classList.add("fresh");
         }
         div.append(te);
       }
       board.append(div);
     });
 
-    if (mine) board.append(el('div', 'new-set', 'Sleep hier een steen naartoe voor een nieuwe reeks'));
+    if (mine)
+      board.append(
+        el(
+          "div",
+          "new-set",
+          "Sleep hier een steen naartoe voor een nieuwe reeks",
+        ),
+      );
     if (preview) {
       const p = roomPlayer(g.currentPlayerId);
-      board.append(el('div', 'preview-note', `${p ? p.name : 'De speler'} is aan het schuiven…`));
+      board.append(
+        el(
+          "div",
+          "preview-note",
+          `${p ? p.name : "De speler"} is aan het schuiven…`,
+        ),
+      );
     }
-    if (!sets.length && !mine) board.append(el('div', 'preview-note', 'Het bord is nog leeg.'));
+    if (!sets.length && !mine)
+      board.append(el("div", "preview-note", "Het bord is nog leeg."));
   }
 
   function renderRack() {
-    const rack = $('rack');
+    const rack = $("rack");
     rack.replaceChildren();
     const g = game();
     if (!inGame()) {
-      rack.append(el('div', 'muted', 'Je kijkt mee en doet mee vanaf de volgende ronde.'));
+      rack.append(
+        el("div", "muted", "Je kijkt mee en doet mee vanaf de volgende ronde."),
+      );
       return;
     }
     const onBoard = new Set(S.board.flat());
     for (const id of S.rack) {
       if (onBoard.has(id)) continue;
       const te = tileEl(tile(id));
-      if (!g.finished) te.classList.add('draggable');
-      if (S.newDraws.has(id)) te.classList.add('new-draw');
+      if (!g.finished) te.classList.add("draggable");
+      if (S.newDraws.has(id)) te.classList.add("new-draw");
       rack.append(te);
     }
   }
@@ -337,72 +388,87 @@
     const g = game();
     const mine = isMyTurn();
     const placed = mine ? placedIds().length : 0;
-    $('btn-play').disabled = !mine || !placed;
-    $('btn-draw').disabled = !mine;
-    $('btn-draw').textContent = g.poolCount ? 'Steen pakken' : 'Passen';
-    $('btn-reset').disabled = !mine;
-    $('btn-show-result').classList.toggle('hidden', !g.finished);
-    for (const id of ['btn-play', 'btn-draw', 'btn-reset']) $(id).classList.toggle('hidden', g.finished);
+    $("btn-play").disabled = !mine || !placed;
+    $("btn-draw").disabled = !mine;
+    $("btn-draw").textContent = g.poolCount ? "Steen pakken" : "Passen";
+    $("btn-reset").disabled = !mine;
+    $("btn-show-result").classList.toggle("hidden", !g.finished);
+    for (const id of ["btn-play", "btn-draw", "btn-reset"])
+      $(id).classList.toggle("hidden", g.finished);
 
-    const line = $('status-line');
-    line.classList.toggle('myturn', mine);
+    const line = $("status-line");
+    line.classList.toggle("myturn", mine);
     if (g.finished) {
-      line.textContent = 'De ronde is voorbij.';
+      line.textContent = "De ronde is voorbij.";
     } else if (!inGame()) {
-      line.textContent = `${roomPlayer(g.currentPlayerId)?.name || 'Iemand'} is aan de beurt.`;
+      line.textContent = `${roomPlayer(g.currentPlayerId)?.name || "Iemand"} is aan de beurt.`;
     } else if (mine) {
-      let text = 'Jouw beurt! Sleep stenen naar het bord.';
+      let text = "Jouw beurt! Sleep stenen naar het bord.";
       if (!g.hasMelded) {
         const pts = S.board
           .filter((set) => set.length && set.every(isFresh))
           .reduce((s, set) => s + Rules.setPoints(set.map(tile)), 0);
         text += ` Eerste uitleg: ${pts}/${Rules.MIN_INITIAL_MELD} punten.`;
       }
-      if (S.board.some((set) => !Rules.analyzeSet(set.map(tile)))) text += ' Let op: er zijn ongeldige reeksen (rood).';
+      if (S.board.some((set) => !Rules.analyzeSet(set.map(tile))))
+        text += " Let op: er zijn ongeldige reeksen (rood).";
       line.textContent = text;
     } else {
-      line.textContent = `${roomPlayer(g.currentPlayerId)?.name || 'Iemand'} is aan de beurt.`;
+      line.textContent = `${roomPlayer(g.currentPlayerId)?.name || "Iemand"} is aan de beurt.`;
     }
   }
 
   function renderResult() {
     const g = game();
-    const overlay = $('result');
+    const overlay = $("result");
     if (!g.finished || S.resultDismissed === S.turnKey) {
-      overlay.classList.add('hidden');
+      overlay.classList.add("hidden");
       return;
     }
     const r = g.result;
     const winner = roomPlayer(r.winnerId);
-    $('result-title').textContent = r.winnerId === me() ? 'Je hebt gewonnen!' : `${winner ? winner.name : 'Iemand'} wint ronde ${S.room.round}!`;
-    const tbody = $('result-table').querySelector('tbody');
+    $("result-title").textContent =
+      r.winnerId === me()
+        ? "Je hebt gewonnen!"
+        : `${winner ? winner.name : "Iemand"} wint ronde ${S.room.round}!`;
+    const tbody = $("result-table").querySelector("tbody");
     tbody.replaceChildren();
-    for (const rp of r.players.slice().sort((a, b) => b.roundScore - a.roundScore)) {
+    for (const rp of r.players
+      .slice()
+      .sort((a, b) => b.roundScore - a.roundScore)) {
       const p = roomPlayer(rp.id);
-      const tr = el('tr', rp.id === r.winnerId ? 'winner' : '');
+      const tr = el("tr", rp.id === r.winnerId ? "winner" : "");
       tr.append(
-        el('td', '', p ? p.name : '?'),
-        el('td', 'num', rp.rack.length ? `${rp.rack.length} (${rp.penalty})` : '0'),
-        el('td', 'num', rp.roundScore > 0 ? `+${rp.roundScore}` : String(rp.roundScore)),
-        el('td', 'num', p ? String(p.score) : '-'),
+        el("td", "", p ? p.name : "?"),
+        el(
+          "td",
+          "num",
+          rp.rack.length ? `${rp.rack.length} (${rp.penalty})` : "0",
+        ),
+        el(
+          "td",
+          "num",
+          rp.roundScore > 0 ? `+${rp.roundScore}` : String(rp.roundScore),
+        ),
+        el("td", "num", p ? String(p.score) : "-"),
       );
       tbody.append(tr);
     }
     const isHost = S.room.hostId === me();
-    $('btn-new-round').classList.toggle('hidden', !isHost);
-    $('result-wait').classList.toggle('hidden', isHost);
-    overlay.classList.remove('hidden');
+    $("btn-new-round").classList.toggle("hidden", !isHost);
+    $("result-wait").classList.toggle("hidden", isHost);
+    overlay.classList.remove("hidden");
   }
 
   // ---------- timer ----------
 
   setInterval(() => {
     const g = game();
-    const label = $('turn-timer');
-    const fill = $('timer-fill');
+    const label = $("turn-timer");
+    const fill = $("timer-fill");
     if (!g || g.finished || !S.deadline) {
-      label.textContent = '';
-      fill.style.width = '0';
+      label.textContent = "";
+      fill.style.width = "0";
       return;
     }
     const remaining = Math.max(0, S.deadline - Date.now());
@@ -410,8 +476,8 @@
     const secs = Math.ceil(remaining / 1000);
     const low = secs <= 10;
     label.textContent = `${secs}s`;
-    label.classList.toggle('low', low);
-    fill.classList.toggle('low', low);
+    label.classList.toggle("low", low);
+    fill.classList.toggle("low", low);
     fill.style.width = `${Math.min(100, (remaining / total) * 100)}%`;
   }, 250);
 
@@ -420,14 +486,16 @@
   function locate(id) {
     for (let s = 0; s < S.board.length; s++) {
       const i = S.board[s].indexOf(id);
-      if (i >= 0) return { type: 'board', set: s, index: i };
+      if (i >= 0) return { type: "board", set: s, index: i };
     }
-    if (S.rack.includes(id)) return { type: 'rack' };
+    if (S.rack.includes(id)) return { type: "rack" };
     return null;
   }
 
   function insertIndex(container, x, y, dragId, rowOnly) {
-    const kids = [...container.querySelectorAll(':scope > .tile')].filter((e) => Number(e.dataset.id) !== dragId);
+    const kids = [...container.querySelectorAll(":scope > .tile")].filter(
+      (e) => Number(e.dataset.id) !== dragId,
+    );
     for (let i = 0; i < kids.length; i++) {
       const r = kids[i].getBoundingClientRect();
       if (rowOnly) {
@@ -446,33 +514,37 @@
     const target = document.elementFromPoint(x, y);
     if (!g || g.finished || !from || !target) return render();
 
-    const rackEl = target.closest('#rack');
-    const setEl = target.closest('.set');
-    const boardEl = target.closest('#board-wrap');
+    const rackEl = target.closest("#rack");
+    const setEl = target.closest(".set");
+    const boardEl = target.closest("#board-wrap");
 
     if (rackEl) {
-      if (from.type === 'board' && !isFresh(id)) return toast('Stenen van het bord mogen niet naar je rek.', true);
+      if (from.type === "board" && !isFresh(id))
+        return toast("Stenen van het bord mogen niet naar je rek.", true);
       // Rack DOM omits tiles that are on the board, so map the visual index back to S.rack.
       const onBoard = new Set(S.board.flat());
       const visible = S.rack.filter((r) => !onBoard.has(r) && r !== id);
       const idx = insertIndex(rackEl, x, y, id, false);
-      if (from.type === 'board') S.board[from.set].splice(from.index, 1);
+      if (from.type === "board") S.board[from.set].splice(from.index, 1);
       S.rack = S.rack.filter((r) => r !== id);
       const before = visible[idx];
       const pos = before === undefined ? S.rack.length : S.rack.indexOf(before);
       S.rack.splice(pos, 0, id);
     } else if (setEl || boardEl) {
-      if (!isMyTurn()) return toast('Je bent niet aan de beurt.', true);
+      if (!isMyTurn()) return toast("Je bent niet aan de beurt.", true);
       if (setEl) {
         const si = Number(setEl.dataset.index);
         if (!g.hasMelded && S.board[si].some((t) => !isFresh(t))) {
-          return toast(`Leg eerst ${Rules.MIN_INITIAL_MELD} punten uit voordat je bestaande reeksen aanpast.`, true);
+          return toast(
+            `Leg eerst ${Rules.MIN_INITIAL_MELD} punten uit voordat je bestaande reeksen aanpast.`,
+            true,
+          );
         }
         const idx = insertIndex(setEl, x, y, id, true);
-        if (from.type === 'board') S.board[from.set].splice(from.index, 1);
+        if (from.type === "board") S.board[from.set].splice(from.index, 1);
         S.board[si].splice(idx, 0, id);
       } else {
-        if (from.type === 'board') S.board[from.set].splice(from.index, 1);
+        if (from.type === "board") S.board[from.set].splice(from.index, 1);
         S.board.push([id]);
       }
       if (!S.rack.includes(id) && isFresh(id)) S.rack.push(id);
@@ -484,7 +556,7 @@
   }
 
   function afterLocalChange() {
-    if (isMyTurn()) socket.emit('preview', { board: S.board });
+    if (isMyTurn()) socket.emit("preview", { board: S.board });
     renderGame();
   }
 
@@ -493,111 +565,137 @@
   let drag = null;
 
   function clearDropTargets() {
-    document.querySelectorAll('.drop-target').forEach((e) => e.classList.remove('drop-target'));
+    document
+      .querySelectorAll(".drop-target")
+      .forEach((e) => e.classList.remove("drop-target"));
   }
 
   function endDrag() {
     if (!drag) return;
     drag.ghost?.remove();
-    drag.el.classList.remove('dragging');
+    drag.el.classList.remove("dragging");
     clearDropTargets();
     drag = null;
   }
 
-  document.addEventListener('pointerdown', (e) => {
+  document.addEventListener("pointerdown", (e) => {
     if (e.button !== 0) return;
-    const t = e.target.closest('.tile.draggable');
+    const t = e.target.closest(".tile.draggable");
     if (!t) return;
     e.preventDefault();
     const r = t.getBoundingClientRect();
-    drag = { id: Number(t.dataset.id), el: t, x0: e.clientX, y0: e.clientY, offX: e.clientX - r.left, offY: e.clientY - r.top, ghost: null };
+    drag = {
+      id: Number(t.dataset.id),
+      el: t,
+      x0: e.clientX,
+      y0: e.clientY,
+      offX: e.clientX - r.left,
+      offY: e.clientY - r.top,
+      ghost: null,
+    };
   });
 
-  document.addEventListener('pointermove', (e) => {
+  document.addEventListener("pointermove", (e) => {
     if (!drag) return;
     if (!drag.ghost) {
       if (Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) < 4) return;
       drag.ghost = drag.el.cloneNode(true);
-      drag.ghost.classList.add('ghost');
-      drag.ghost.classList.remove('draggable', 'new-draw');
+      drag.ghost.classList.add("ghost");
+      drag.ghost.classList.remove("draggable", "new-draw");
       document.body.append(drag.ghost);
-      drag.el.classList.add('dragging');
+      drag.el.classList.add("dragging");
     }
     drag.ghost.style.left = `${e.clientX - drag.offX}px`;
     drag.ghost.style.top = `${e.clientY - drag.offY}px`;
     clearDropTargets();
     const under = document.elementFromPoint(e.clientX, e.clientY);
-    const zone = under && (under.closest('.set, .new-set, #rack') || (isMyTurn() && under.closest('#board-wrap') && $('board').querySelector('.new-set')));
-    if (zone) zone.classList.add('drop-target');
+    const zone =
+      under &&
+      (under.closest(".set, .new-set, #rack") ||
+        (isMyTurn() &&
+          under.closest("#board-wrap") &&
+          $("board").querySelector(".new-set")));
+    if (zone) zone.classList.add("drop-target");
   });
 
-  document.addEventListener('pointerup', (e) => {
+  document.addEventListener("pointerup", (e) => {
     if (!drag) return;
     const { id, ghost } = drag;
     endDrag();
     if (ghost) dropTile(id, e.clientX, e.clientY);
   });
-  document.addEventListener('pointercancel', endDrag);
+  document.addEventListener("pointercancel", endDrag);
 
   // ---------- buttons ----------
 
-  $('btn-play').onclick = () => {
-    socket.emit('play', { board: S.board }, (res) => {
+  $("btn-play").onclick = () => {
+    socket.emit("play", { board: S.board }, (res) => {
       if (!res.ok) toast(res.error, true);
     });
   };
 
-  $('btn-draw').onclick = () => {
-    socket.emit('draw', {}, (res) => !res.ok && toast(res.error, true));
+  $("btn-draw").onclick = () => {
+    socket.emit("draw", {}, (res) => !res.ok && toast(res.error, true));
   };
 
-  $('btn-reset').onclick = () => {
+  $("btn-reset").onclick = () => {
     const g = game();
     S.board = g.board.map((set) => set.map((t) => t.id));
     for (const id of S.turnStartRack) if (!S.rack.includes(id)) S.rack.push(id);
     afterLocalChange();
   };
 
-  $('btn-sort-num').onclick = () => {
-    S.rack = sortIds(S.rack, 'number');
+  $("btn-sort-num").onclick = () => {
+    S.rack = sortIds(S.rack, "number");
     renderRack();
   };
-  $('btn-sort-color').onclick = () => {
-    S.rack = sortIds(S.rack, 'color');
+  $("btn-sort-color").onclick = () => {
+    S.rack = sortIds(S.rack, "color");
     renderRack();
   };
 
   function leave() {
     const g = game();
-    if (g && !g.finished && inGame() && !confirm('Weet je zeker dat je het spel wilt verlaten? Een bot neemt je plek over.')) return;
-    socket.emit('leaveRoom');
+    if (
+      g &&
+      !g.finished &&
+      inGame() &&
+      !confirm(
+        "Weet je zeker dat je het spel wilt verlaten? Een bot neemt je plek over.",
+      )
+    )
+      return;
+    socket.emit("leaveRoom");
     goHome();
   }
-  $('btn-leave-lobby').onclick = leave;
-  $('btn-leave-game').onclick = leave;
+  $("btn-leave-lobby").onclick = leave;
+  $("btn-leave-game").onclick = leave;
 
-  $('btn-copy').onclick = async () => {
+  $("btn-copy").onclick = async () => {
     const link = `${location.origin}/?room=${S.room.code}`;
     try {
       await navigator.clipboard.writeText(link);
-      toast('Uitnodigingslink gekopieerd!');
+      toast("Uitnodigingslink gekopieerd!");
     } catch {
-      prompt('Kopieer deze link:', link);
+      prompt("Kopieer deze link:", link);
     }
   };
 
-  $('btn-add-bot').onclick = () => socket.emit('addBot', {}, (res) => !res.ok && toast(res.error, true));
-  $('timer-select').onchange = (e) => socket.emit('setTimer', { seconds: Number(e.target.value) });
-  $('btn-start').onclick = () =>
-    socket.emit('startGame', {}, (res) => {
-      $('lobby-error').textContent = res.ok ? '' : res.error;
+  $("btn-add-bot").onclick = () =>
+    socket.emit("addBot", {}, (res) => !res.ok && toast(res.error, true));
+  $("timer-select").onchange = (e) =>
+    socket.emit("setTimer", { seconds: Number(e.target.value) });
+  $("btn-start").onclick = () =>
+    socket.emit("startGame", {}, (res) => {
+      $("lobby-error").textContent = res.ok ? "" : res.error;
     });
-  $('btn-new-round').onclick = () => socket.emit('newRound', {}, (res) => !res.ok && toast(res.error, true));
-  $('btn-view-board').onclick = () => {
+  $("btn-new-round").onclick = () =>
+    socket.emit("newRound", {}, (res) => !res.ok && toast(res.error, true));
+  $("btn-view-board").onclick = () => {
     S.resultDismissed = S.turnKey;
-    $('result').classList.add('hidden');
+    $("result").classList.add("hidden");
   };
-  $('btn-show-result').onclick = () => {
+  $("btn-show-result").onclick = () => {
     S.resultDismissed = null;
     renderResult();
   };
@@ -605,29 +703,33 @@
   // ---------- chat ----------
 
   function chatLine(msg) {
-    const line = el('div', `msg ${msg.type}`);
-    if (msg.type === 'system') line.textContent = msg.text;
-    else line.append(el('span', 'who', `${msg.name}:`), document.createTextNode(msg.text));
+    const line = el("div", `msg ${msg.type}`);
+    if (msg.type === "system") line.textContent = msg.text;
+    else
+      line.append(
+        el("span", "who", `${msg.name}:`),
+        document.createTextNode(msg.text),
+      );
     return line;
   }
 
   function appendChat(msgs, replace) {
-    const log = $('chat-log');
+    const log = $("chat-log");
     const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
     if (replace) log.replaceChildren();
     log.append(...msgs.map(chatLine));
     if (atBottom || replace) log.scrollTop = log.scrollHeight;
   }
 
-  socket.on('chatHistory', (msgs) => appendChat(msgs, true));
-  socket.on('chat', (msg) => appendChat([msg], false));
+  socket.on("chatHistory", (msgs) => appendChat(msgs, true));
+  socket.on("chat", (msg) => appendChat([msg], false));
 
-  $('chat-form').onsubmit = (e) => {
+  $("chat-form").onsubmit = (e) => {
     e.preventDefault();
-    const input = $('chat-input');
+    const input = $("chat-input");
     const text = input.value.trim();
     if (!text) return;
-    socket.emit('chat', { text });
-    input.value = '';
+    socket.emit("chat", { text });
+    input.value = "";
   };
 })();

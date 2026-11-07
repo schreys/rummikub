@@ -1,5 +1,5 @@
-const crypto = require('crypto');
-const Rules = require('../public/rules.js');
+const crypto = require("crypto");
+const Rules = require("../public/rules.js");
 
 const RACK_SIZE = 14;
 
@@ -7,11 +7,12 @@ function createTiles() {
   const tiles = [];
   for (let copy = 0; copy < 2; copy++) {
     for (const color of Rules.COLORS) {
-      for (let n = 1; n <= Rules.MAX_NUMBER; n++) tiles.push({ id: tiles.length, color, number: n, joker: false });
+      for (let n = 1; n <= Rules.MAX_NUMBER; n++)
+        tiles.push({ id: tiles.length, color, number: n, joker: false });
     }
   }
-  tiles.push({ id: tiles.length, color: 'joker', number: 0, joker: true });
-  tiles.push({ id: tiles.length, color: 'joker', number: 0, joker: true });
+  tiles.push({ id: tiles.length, color: "joker", number: 0, joker: true });
+  tiles.push({ id: tiles.length, color: "joker", number: 0, joker: true });
   return tiles;
 }
 
@@ -27,7 +28,11 @@ class Game {
   constructor(playerIds) {
     this.tiles = createTiles();
     this.pool = shuffle(this.tiles.map((t) => t.id));
-    this.players = playerIds.map((id) => ({ id, rack: this.pool.splice(0, RACK_SIZE), hasMelded: false }));
+    this.players = playerIds.map((id) => ({
+      id,
+      rack: this.pool.splice(0, RACK_SIZE),
+      hasMelded: false,
+    }));
     this.board = [];
     this.current = crypto.randomInt(this.players.length);
     this.turnNumber = 1;
@@ -50,7 +55,8 @@ class Game {
 
   // Draws a tile (or passes when the pool is empty) and ends the turn.
   draw(playerId) {
-    if (!this.isTurnOf(playerId)) return { ok: false, error: 'Je bent niet aan de beurt.' };
+    if (!this.isTurnOf(playerId))
+      return { ok: false, error: "Je bent niet aan de beurt." };
     const p = this.currentPlayer;
     let tileId = null;
     if (this.pool.length) {
@@ -69,7 +75,8 @@ class Game {
   }
 
   play(playerId, newBoard) {
-    if (!this.isTurnOf(playerId)) return { ok: false, error: 'Je bent niet aan de beurt.' };
+    if (!this.isTurnOf(playerId))
+      return { ok: false, error: "Je bent niet aan de beurt." };
     const p = this.currentPlayer;
     const res = Rules.validateMove({
       oldBoard: this.board,
@@ -101,9 +108,13 @@ class Game {
       penalty: Rules.rackPenalty(p.rack.map((id) => this.tiles[id])),
     }));
     if (winnerId === null) {
-      winnerId = penalties.reduce((best, p) => (p.penalty < best.penalty ? p : best)).id;
+      winnerId = penalties.reduce((best, p) =>
+        p.penalty < best.penalty ? p : best,
+      ).id;
     }
-    const total = penalties.filter((p) => p.id !== winnerId).reduce((s, p) => s + p.penalty, 0);
+    const total = penalties
+      .filter((p) => p.id !== winnerId)
+      .reduce((s, p) => s + p.penalty, 0);
     this.finished = true;
     this.result = {
       winnerId,
@@ -123,7 +134,11 @@ class Game {
       poolCount: this.pool.length,
       currentPlayerId: this.currentPlayer.id,
       turnNumber: this.turnNumber,
-      players: this.players.map((p) => ({ id: p.id, rackCount: p.rack.length, hasMelded: p.hasMelded })),
+      players: this.players.map((p) => ({
+        id: p.id,
+        rackCount: p.rack.length,
+        hasMelded: p.hasMelded,
+      })),
       myRack: me ? me.rack.map((id) => this.tiles[id]) : [],
       hasMelded: me ? me.hasMelded : false,
       finished: this.finished,

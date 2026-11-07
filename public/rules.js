@@ -1,10 +1,10 @@
 // Shared game rules: loaded by the Node server (require) and the browser (window.Rules).
 (function (root, factory) {
   const api = factory();
-  if (typeof module === 'object' && module.exports) module.exports = api;
+  if (typeof module === "object" && module.exports) module.exports = api;
   else root.Rules = api;
-})(typeof self !== 'undefined' ? self : this, function () {
-  const COLORS = ['red', 'blue', 'orange', 'black'];
+})(typeof self !== "undefined" ? self : this, function () {
+  const COLORS = ["red", "blue", "orange", "black"];
   const JOKER_PENALTY = 30;
   const MIN_INITIAL_MELD = 30;
   const MAX_NUMBER = 13;
@@ -19,7 +19,8 @@
     const values = [];
     for (let i = 0; i < tiles.length; i++) {
       const t = tiles[i];
-      if (!t.joker && (t.color !== color || t.number !== start + i)) return null;
+      if (!t.joker && (t.color !== color || t.number !== start + i))
+        return null;
       values.push(start + i);
     }
     return values;
@@ -41,7 +42,9 @@
   // Sorts a run that was laid out in the wrong order; jokers fill gaps, then extend upwards.
   function arrangeRun(tiles) {
     if (tiles.length > MAX_NUMBER) return null;
-    const real = tiles.filter((t) => !t.joker).sort((a, b) => a.number - b.number);
+    const real = tiles
+      .filter((t) => !t.joker)
+      .sort((a, b) => a.number - b.number);
     const jokers = tiles.filter((t) => t.joker);
     if (!real.length) return null;
     const color = real[0].color;
@@ -71,13 +74,15 @@
 
   // Returns { type, tiles (ordered), values } for a valid set, otherwise null.
   function analyzeSet(tiles) {
-    if (!Array.isArray(tiles) || tiles.length < 3 || tiles.some((t) => !t)) return null;
+    if (!Array.isArray(tiles) || tiles.length < 3 || tiles.some((t) => !t))
+      return null;
     const run = runInOrder(tiles);
-    if (run) return { type: 'run', tiles, values: run };
+    if (run) return { type: "run", tiles, values: run };
     const group = groupValues(tiles);
-    if (group) return { type: 'group', tiles, values: group };
+    if (group) return { type: "group", tiles, values: group };
     const arranged = arrangeRun(tiles);
-    if (arranged) return { type: 'run', tiles: arranged.tiles, values: arranged.values };
+    if (arranged)
+      return { type: "run", tiles: arranged.tiles, values: arranged.values };
     return null;
   }
 
@@ -91,7 +96,7 @@
   }
 
   function setKey(ids) {
-    return [...ids].sort((a, b) => a - b).join(',');
+    return [...ids].sort((a, b) => a - b).join(",");
   }
 
   function fail(error) {
@@ -103,7 +108,8 @@
    * tiles: lookup id -> tile. Returns { ok, error?, board?, played?, points? }.
    */
   function validateMove({ oldBoard, newBoard, rack, tiles, hasMelded }) {
-    if (!Array.isArray(newBoard) || newBoard.some((s) => !Array.isArray(s))) return fail('Ongeldig bord.');
+    if (!Array.isArray(newBoard) || newBoard.some((s) => !Array.isArray(s)))
+      return fail("Ongeldig bord.");
     newBoard = newBoard.filter((s) => s.length);
     const oldIds = new Set(oldBoard.flat());
     const rackIds = new Set(rack);
@@ -111,22 +117,25 @@
     const played = [];
     for (const set of newBoard) {
       for (const id of set) {
-        if (!Number.isInteger(id) || seen.has(id)) return fail('Ongeldige of dubbele steen.');
+        if (!Number.isInteger(id) || seen.has(id))
+          return fail("Ongeldige of dubbele steen.");
         seen.add(id);
         if (oldIds.has(id)) continue;
         if (rackIds.has(id)) played.push(id);
-        else return fail('Onbekende steen.');
+        else return fail("Onbekende steen.");
       }
     }
     for (const id of oldIds) {
-      if (!seen.has(id)) return fail('Stenen van het bord mogen niet terug naar je rek.');
+      if (!seen.has(id))
+        return fail("Stenen van het bord mogen niet terug naar je rek.");
     }
-    if (!played.length) return fail('Leg minstens één steen uit je rek, of pak een steen.');
+    if (!played.length)
+      return fail("Leg minstens één steen uit je rek, of pak een steen.");
 
     const normalized = [];
     for (const set of newBoard) {
       const a = analyzeSet(set.map((id) => tiles[id]));
-      if (!a) return fail('Niet alle reeksen op het bord zijn geldig.');
+      if (!a) return fail("Niet alle reeksen op het bord zijn geldig.");
       normalized.push(a.tiles.map((t) => t.id));
     }
 
@@ -142,16 +151,21 @@
         const fromRack = set.filter((id) => playedSet.has(id)).length;
         if (fromRack === 0) {
           const k = setKey(set);
-          if (!oldKeys.get(k)) return fail('Je mag het bord pas aanpassen na je eerste uitleg.');
+          if (!oldKeys.get(k))
+            return fail("Je mag het bord pas aanpassen na je eerste uitleg.");
           oldKeys.set(k, oldKeys.get(k) - 1);
         } else if (fromRack !== set.length) {
-          return fail('Voor je eerste uitleg mag je alleen je eigen stenen gebruiken.');
+          return fail(
+            "Voor je eerste uitleg mag je alleen je eigen stenen gebruiken.",
+          );
         } else {
           points += setPoints(set.map((id) => tiles[id]));
         }
       }
       if (points < MIN_INITIAL_MELD) {
-        return fail(`Je eerste uitleg moet minstens ${MIN_INITIAL_MELD} punten zijn (nu ${points}).`);
+        return fail(
+          `Je eerste uitleg moet minstens ${MIN_INITIAL_MELD} punten zijn (nu ${points}).`,
+        );
       }
     }
     return { ok: true, board: normalized, played, points };

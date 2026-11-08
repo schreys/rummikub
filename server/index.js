@@ -64,7 +64,27 @@ function gameRunning(room) {
 }
 
 function connectedHumans(room) {
-  return room.players.filter((p) => !p.isBot && p.connected);
+  return room.players.filter((p) => !p.isBot && !p.controllerId && p.connected);
+}
+
+// A device (socket owner) controls its own seat plus any local players it added.
+function controls(owner, p) {
+  return p.id === owner.id || p.controllerId === owner.id;
+}
+
+function isConnected(room, p) {
+  if (!p.controllerId) return p.connected;
+  const owner = playerById(room, p.controllerId);
+  return !!owner && owner.connected;
+}
+
+// The seat whose rack this device sees: the current player if this device controls it.
+function seatFor(room, owner) {
+  if (gameRunning(room)) {
+    const cur = playerById(room, room.game.currentPlayer.id);
+    if (cur && controls(owner, cur)) return cur.id;
+  }
+  return owner.id;
 }
 
 function pushChat(room, msg) {
@@ -79,9 +99,10 @@ function sysMsg(room, text) {
 }
 
 function roomStateFor(room, player) {
+  const seat = seatFor(room, player);
   let game = null;
   if (room.game) {
-    game = room.game.stateFor(player.id);
+    game = room.game.stateFor(seat);
     game.turnRemainingMs = room.turnDeadline
       ? Math.max(0, room.turnDeadline - Date.now())
       : null;
@@ -90,16 +111,22 @@ function roomStateFor(room, player) {
     code: room.code,
     hostId: room.hostId,
     you: player.id,
+    seat,
+    localSeats: room.players
+      .filter((p) => controls(player, p))
+      .map((p) => p.id),
     round: room.round,
     settings: room.settings,
     maxPlayers: MAX_PLAYERS,
     timerOptions: TIMER_OPTIONS,
-    players: room.players.map(({ id, name, isBot, connected, score }) => ({
-      id,
-      name,
-      isBot,
-      connected,
-      score,
+    players: room.players.map((p) => ({
+      id: p.id,
+      name: p.name,
+      isBot: p.isBot,
+      isLocal: !!p.controllerId,
+      controllerId: p.controllerId || null,
+      connected: isConnected(room, p),
+      score: p.score,
     })),
     game,
   };
@@ -137,7 +164,9 @@ function checkEmpty(room) {
 
 function removePlayer(room, p) {
   clearTimeout(p.removeTimer);
-  room.players = room.players.filter((x) => x.id !== p.id);
+  room.players = room.players.filter(
+    (x) => x.id !== p.id && x.controllerId !== p.id,
+  );
 }
 
 // ---------- turn flow ----------
@@ -175,7 +204,7 @@ function startTurn(room) {
     room.turnDeadline = Date.now() + secs * 1000;
     room.turnTimer = setTimeout(() => onTimeout(room, false), secs * 1000);
   }
-  if (!p.connected) startGrace(room);
+  if (!isConnected(room, p)) startGrace(room);
 }
 
 function afterTurn(room) {
@@ -274,13 +303,18 @@ function detach(socket, explicit) {
 
   if (explicit) {
     if (gameRunning(room)) {
-      p.isBot = true;
-      p.token = null;
+      const seats = room.players.filter((x) => controls(p, x));
+      for (const x of seats) {
+        x.isBot = true;
+        x.token = null;
+        x.controllerId = null;
+      }
       sysMsg(
         room,
         `${p.name} heeft het spel verlaten; een bot neemt het over.`,
       );
-      if (room.game.currentPlayer.id === p.id) startTurn(room);
+      if (seats.some((x) => x.id === room.game.currentPlayer.id))
+        startTurn(room);
     } else {
       removePlayer(room, p);
       sysMsg(room, `${p.name} heeft het spel verlaten.`);
@@ -289,7 +323,8 @@ function detach(socket, explicit) {
     p.connected = false;
     sysMsg(room, `${p.name} heeft de verbinding verloren.`);
     if (gameRunning(room)) {
-      if (room.game.currentPlayer.id === p.id) startGrace(room);
+      const cur = playerById(room, room.game.currentPlayer.id);
+      if (cur && controls(p, cur)) startGrace(room);
     } else {
       p.removeTimer = setTimeout(() => {
         if (p.connected || gameRunning(room) || !rooms.has(room.code)) return;
@@ -314,6 +349,13 @@ io.on("connection", (socket) => {
   const hostCtx = () => {
     const c = ctx();
     return c && c.room.hostId === c.player.id ? c : null;
+  };
+  // Context for game actions: the current player must be controlled by this device.
+  const turnCtx = () => {
+    const c = ctx();
+    if (!c || !gameRunning(c.room)) return null;
+    const seat = playerById(c.room, c.room.game.currentPlayer.id);
+    return seat && controls(c.player, seat) ? { ...c, seat } : null;
   };
 
   socket.on("createRoom", (data, cb) => {
@@ -371,8 +413,9 @@ io.on("connection", (socket) => {
       if (!p.connected) message = `${p.name} is weer verbonden.`;
       p.connected = true;
       clearTimeout(p.removeTimer);
-      if (gameRunning(room) && room.game.currentPlayer.id === p.id)
-        clearTimeout(room.graceTimer);
+      const cur =
+        gameRunning(room) && playerById(room, room.game.currentPlayer.id);
+      if (cur && controls(p, cur)) clearTimeout(room.graceTimer);
     } else {
       const name = cleanText(data?.name, 20);
       if (!name) return reply(cb, { ok: false, error: "Vul een naam in." });
@@ -431,13 +474,40 @@ io.on("connection", (socket) => {
     reply(cb, { ok: true });
   });
 
+  socket.on("addLocalPlayer", (data, cb) => {
+    const c = ctx();
+    if (!c) return reply(cb, { ok: false, error: "Je zit niet in een spel." });
+    const { room, player } = c;
+    if (gameRunning(room))
+      return reply(cb, { ok: false, error: "Het spel is al bezig." });
+    if (room.players.length >= MAX_PLAYERS)
+      return reply(cb, { ok: false, error: "Het spel is vol." });
+    const name = cleanText(data?.name, 20);
+    if (!name) return reply(cb, { ok: false, error: "Vul een naam in." });
+    room.players.push({
+      id: crypto.randomUUID(),
+      token: null,
+      name,
+      isBot: false,
+      controllerId: player.id,
+      socketId: null,
+      connected: true,
+      score: 0,
+    });
+    sysMsg(room, `${name} speelt mee op het toestel van ${player.name}.`);
+    broadcast(room);
+    reply(cb, { ok: true });
+  });
+
   socket.on("removePlayer", (data, cb) => {
-    const c = hostCtx();
-    if (!c) return reply(cb, { ok: false, error: "Alleen de host kan dit." });
+    const c = ctx();
+    if (!c) return reply(cb, { ok: false, error: "Je zit niet in een spel." });
     const { room, player } = c;
     const target = playerById(room, data?.playerId);
     if (!target || target.id === player.id)
       return reply(cb, { ok: false, error: "Ongeldige speler." });
+    if (room.hostId !== player.id && target.controllerId !== player.id)
+      return reply(cb, { ok: false, error: "Alleen de host kan dit." });
     if (gameRunning(room))
       return reply(cb, { ok: false, error: "Het spel is al bezig." });
     const s = target.socketId && io.sockets.sockets.get(target.socketId);
@@ -447,7 +517,7 @@ io.on("connection", (socket) => {
       s.emit("kicked", { reason: "De host heeft je uit het spel verwijderd." });
     }
     removePlayer(room, target);
-    if (!target.isBot)
+    if (!target.isBot && !target.controllerId)
       sysMsg(room, `${target.name} is verwijderd door de host.`);
     broadcast(room);
     reply(cb, { ok: true });
@@ -480,30 +550,28 @@ io.on("connection", (socket) => {
   });
 
   socket.on("draw", (_data, cb) => {
-    const c = ctx();
-    if (!c || !gameRunning(c.room) || !c.room.game.isTurnOf(c.player.id)) {
+    const c = turnCtx();
+    if (!c)
       return reply(cb, { ok: false, error: "Je bent niet aan de beurt." });
-    }
-    drawFor(c.room, c.player);
+    drawFor(c.room, c.seat);
     reply(cb, { ok: true });
   });
 
   socket.on("play", (data, cb) => {
-    const c = ctx();
-    if (!c || !gameRunning(c.room))
-      return reply(cb, { ok: false, error: "Er is geen spel bezig." });
-    const res = c.room.game.play(c.player.id, data?.board);
+    const c = turnCtx();
+    if (!c)
+      return reply(cb, { ok: false, error: "Je bent niet aan de beurt." });
+    const res = c.room.game.play(c.seat.id, data?.board);
     if (!res.ok) return reply(cb, res);
-    sysMsg(c.room, `${c.player.name} legt ${tilesText(res.played.length)}.`);
+    sysMsg(c.room, `${c.seat.name} legt ${tilesText(res.played.length)}.`);
     afterTurn(c.room);
     reply(cb, { ok: true });
   });
 
   // Live view of the current player's work-in-progress for the other players.
   socket.on("preview", (data) => {
-    const c = ctx();
-    if (!c || !gameRunning(c.room) || !c.room.game.isTurnOf(c.player.id))
-      return;
+    const c = turnCtx();
+    if (!c) return;
     const g = c.room.game;
     const board = data?.board;
     if (!Array.isArray(board) || board.length > 80) return;

@@ -50,6 +50,15 @@
               </button>
             </p>
             <ul id="lobby-players" class="player-list"></ul>
+            <div id="local-add" class="row local-add">
+              <input
+                id="local-name"
+                maxlength="20"
+                placeholder="Naam medespeler"
+                autocomplete="off"
+              />
+              <button id="btn-add-local">+ Speler op dit toestel</button>
+            </div>
             <div id="host-controls">
               <button id="btn-add-bot">+ Bot toevoegen</button>
               <label
@@ -149,6 +158,14 @@
           Wachten tot de host een nieuwe ronde start…
         </p>
         <button id="btn-view-board" class="link">Bord bekijken</button>
+      </div>
+    </div>
+
+    <div id="handoff" class="overlay hidden">
+      <div class="card">
+        <p class="muted">Geef het toestel aan</p>
+        <h2 id="handoff-name"></h2>
+        <button id="btn-handoff" class="primary"></button>
       </div>
     </div>
 

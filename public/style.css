@@ -234,6 +234,17 @@ select {
   align-items: center;
   gap: 6px;
 }
+.local-add {
+  margin-bottom: 14px;
+}
+#handoff {
+  background: rgba(8, 30, 20, 0.97);
+}
+#handoff h2 {
+  margin: 4px 0 18px;
+  font-size: 2rem;
+  color: var(--accent);
+}
 
 /* ---------- game ---------- */
 #game {

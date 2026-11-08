@@ -18,6 +18,9 @@
     preview: null,
     resultDismissed: null,
     deadline: null,
+    seat: null,
+    rackOrders: new Map(), // rack order per local seat
+    revealed: null, // turnKey for which the hand-off screen was dismissed
   };
 
   // ---------- session ----------
@@ -42,13 +45,25 @@
 
   const game = () => S.room && S.room.game;
   const me = () => S.room && S.room.you;
+  // The game seat this device is currently acting/viewing as (differs from me() for local players).
+  const seat = () => S.room && (S.room.seat || S.room.you);
+  const multiLocal = () => !!S.room && S.room.localSeats.length > 1;
   const isMyTurn = () => {
     const g = game();
-    return !!g && !g.finished && g.currentPlayerId === me();
+    return !!g && !g.finished && g.currentPlayerId === seat();
   };
   const inGame = () => {
     const g = game();
-    return !!g && g.players.some((p) => p.id === me());
+    return !!g && g.players.some((p) => p.id === seat());
+  };
+  const rackHidden = () => {
+    const g = game();
+    return (
+      multiLocal() &&
+      !!g &&
+      !g.finished &&
+      (!isMyTurn() || S.revealed !== S.turnKey)
+    );
   };
   const roomPlayer = (id) => S.room.players.find((p) => p.id === id);
   const tile = (id) => S.tiles.get(id);
@@ -169,13 +184,20 @@
     const serverRack = g.myRack.map((t) => t.id);
     const key = `${state.round}:${g.turnNumber}:${g.finished}`;
     const newRound = state.round !== S.round;
+    if (newRound) S.rackOrders = new Map();
+    const seatChanged = state.seat !== S.seat;
+    if (seatChanged) {
+      if (S.seat && !newRound) S.rackOrders.set(S.seat, S.rack);
+      S.rack = S.rackOrders.get(state.seat) || [];
+      S.seat = state.seat;
+    }
 
     if (!(isMyTurn() && key === S.turnKey)) {
       S.board = g.board.map((set) => set.map((t) => t.id));
-      if (newRound) {
+      if (newRound || !S.rack.length) {
         S.rack = sortIds(serverRack, "color");
         S.newDraws = new Set();
-        S.resultDismissed = null;
+        if (newRound) S.resultDismissed = null;
       } else {
         const known = new Set(serverRack);
         const kept = S.rack.filter((id) => known.has(id));
@@ -183,6 +205,7 @@
         const added = serverRack.filter((id) => !keptSet.has(id));
         S.rack = [...kept, ...added];
         if (added.length) S.newDraws = new Set(added);
+        else if (seatChanged) S.newDraws = new Set();
       }
       S.turnStartRack = new Set(serverRack);
       if (key !== S.turnKey) S.preview = null;
@@ -236,8 +259,18 @@
       li.append(el("span", "name", p.name + (p.id === me() ? " (jij)" : "")));
       if (p.id === r.hostId) li.append(el("span", "badge host", "host"));
       if (p.isBot) li.append(el("span", "badge", "bot"));
+      if (p.isLocal)
+        li.append(
+          el(
+            "span",
+            "badge",
+            p.controllerId === me()
+              ? "op dit toestel"
+              : `bij ${roomPlayer(p.controllerId)?.name || "?"}`,
+          ),
+        );
       if (!p.connected) li.append(el("span", "badge", "offline"));
-      if (isHost && p.id !== me()) {
+      if ((isHost && p.id !== me()) || p.controllerId === me()) {
         const rm = el("button", "small", "Verwijder");
         rm.onclick = () =>
           socket.emit(
@@ -255,6 +288,7 @@
     $("host-controls").classList.toggle("hidden", !isHost);
     $("lobby-wait").classList.toggle("hidden", isHost);
     $("btn-add-bot").disabled = r.players.length >= r.maxPlayers;
+    $("btn-add-local").disabled = r.players.length >= r.maxPlayers;
     $("btn-start").disabled = r.players.length < 2;
     const sel = $("timer-select");
     if (sel.options.length !== r.timerOptions.length) {
@@ -273,6 +307,22 @@
     renderRack();
     renderControls();
     renderResult();
+    renderHandoff();
+  }
+
+  function renderHandoff() {
+    const g = game();
+    const show =
+      !!g &&
+      !g.finished &&
+      multiLocal() &&
+      isMyTurn() &&
+      S.revealed !== S.turnKey;
+    $("handoff").classList.toggle("hidden", !show);
+    if (!show) return;
+    const name = roomPlayer(seat())?.name || "?";
+    $("handoff-name").textContent = name;
+    $("btn-handoff").textContent = `Ik ben ${name}, toon mijn stenen`;
   }
 
   function renderPlayers() {
@@ -284,7 +334,7 @@
       const chip = el("div", "pchip");
       if (!g.finished && gp.id === g.currentPlayerId)
         chip.classList.add("turn");
-      if (gp.id === me()) chip.classList.add("me");
+      if (S.room.localSeats.includes(gp.id)) chip.classList.add("me");
       if (p.connected === false) chip.classList.add("offline");
       chip.append(el("span", "pname", p.name));
       if (p.isBot) chip.append(el("span", "badge", "bot"));
@@ -370,6 +420,18 @@
       );
       return;
     }
+    if (rackHidden()) {
+      rack.append(
+        el(
+          "div",
+          "muted",
+          isMyTurn()
+            ? "Stenen verborgen."
+            : `Stenen verborgen. ${roomPlayer(g.currentPlayerId)?.name || "Iemand"} is aan de beurt.`,
+        ),
+      );
+      return;
+    }
     const onBoard = new Set(S.board.flat());
     for (const id of S.rack) {
       if (onBoard.has(id)) continue;
@@ -400,7 +462,9 @@
     } else if (!inGame()) {
       line.textContent = `${roomPlayer(g.currentPlayerId)?.name || "Iemand"} is aan de beurt.`;
     } else if (mine) {
-      let text = "Jouw beurt! Sleep stenen naar het bord.";
+      let text = multiLocal()
+        ? `${roomPlayer(seat())?.name} is aan de beurt! Sleep stenen naar het bord.`
+        : "Jouw beurt! Sleep stenen naar het bord.";
       if (!g.hasMelded) {
         const pts = S.board
           .filter((set) => set.length && set.every(isFresh))
@@ -425,7 +489,7 @@
     const r = g.result;
     const winner = roomPlayer(r.winnerId);
     $("result-title").textContent =
-      r.winnerId === me()
+      r.winnerId === me() && !multiLocal()
         ? "Je hebt gewonnen!"
         : `${winner ? winner.name : "Iemand"} wint ronde ${S.room.round}!`;
     const tbody = $("result-table").querySelector("tbody");
@@ -744,6 +808,24 @@
 
   $("btn-add-bot").onclick = () =>
     socket.emit("addBot", {}, (res) => !res.ok && toast(res.error, true));
+  function addLocal() {
+    const input = $("local-name");
+    const name = input.value.trim();
+    if (!name) return input.focus();
+    socket.emit("addLocalPlayer", { name }, (res) => {
+      if (!res.ok) return toast(res.error, true);
+      input.value = "";
+    });
+  }
+  $("btn-add-local").onclick = addLocal;
+  $("local-name").addEventListener(
+    "keydown",
+    (e) => e.key === "Enter" && addLocal(),
+  );
+  $("btn-handoff").onclick = () => {
+    S.revealed = S.turnKey;
+    renderGame();
+  };
   $("timer-select").onchange = (e) =>
     socket.emit("setTimer", { seconds: Number(e.target.value) });
   $("btn-start").onclick = () =>

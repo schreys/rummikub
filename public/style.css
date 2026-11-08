@@ -725,3 +725,43 @@ select {
     min-height: calc(var(--tile-h) + 14px);
   }
 }
+
+@media (max-width: 800px) and (orientation: portrait) {
+  #players-bar {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow: visible;
+  }
+  .pchip {
+    min-width: 0;
+  }
+  .pchip .pname {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .pchip .score {
+    display: none;
+  }
+  .pchip .count {
+    margin-left: auto;
+  }
+  #game-header {
+    padding-right: 64px;
+  }
+  #board {
+    --tile-w: 30px;
+    --tile-h: 42px;
+  }
+  #board .tile {
+    font-size: 1.1rem;
+  }
+}
+
+#game-header,
+#controls,
+#status-line {
+  user-select: none;
+  -webkit-user-select: none;
+}

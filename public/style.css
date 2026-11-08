@@ -719,10 +719,43 @@ select {
   }
 }
 
-/* Phones in landscape: one rack row is enough. */
+/* Phones in landscape: one rack row, status and buttons share a row. */
 @media (max-height: 500px) {
   #rack {
     min-height: calc(var(--tile-h) + 14px);
+  }
+  #game {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      "header header"
+      "timer timer"
+      "board board"
+      "status controls"
+      "rack rack";
+  }
+  #game-header {
+    grid-area: header;
+  }
+  #timer-bar {
+    grid-area: timer;
+  }
+  #board-wrap {
+    grid-area: board;
+  }
+  #status-line {
+    grid-area: status;
+    align-self: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  #controls {
+    grid-area: controls;
+  }
+  #rack {
+    grid-area: rack;
   }
 }
 

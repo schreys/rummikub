@@ -83,7 +83,9 @@
           </div>
           <div id="status-line"></div>
           <div id="controls">
-            <button id="btn-play" class="primary">Beurt beëindigen</button>
+            <button id="btn-play" class="primary" data-short="Klaar">
+              Beurt beëindigen
+            </button>
             <button id="btn-draw">Steen pakken</button>
             <button id="btn-reset">Herstel</button>
             <button id="btn-show-result" class="primary hidden">Uitslag</button>
@@ -95,14 +97,27 @@
               789
             </button>
             <button class="btn-fullscreen small">Volledig scherm</button>
-            <button id="btn-leave-game" class="small link">Verlaten</button>
+            <button
+              id="btn-leave-game"
+              class="small link"
+              data-short="✕"
+              title="Verlaten"
+            >
+              Verlaten
+            </button>
           </div>
           <div id="rack"></div>
         </div>
       </div>
 
+      <button id="btn-chat" class="chat-toggle">
+        Chat <span id="chat-unread" class="unread hidden"></span>
+      </button>
       <aside id="chat">
-        <h3>Chat</h3>
+        <h3>
+          Chat
+          <button id="btn-chat-close" class="small chat-close">Sluiten</button>
+        </h3>
         <div id="chat-log"></div>
         <form id="chat-form" autocomplete="off">
           <input

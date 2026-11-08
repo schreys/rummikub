@@ -290,13 +290,9 @@
       if (p.isBot) chip.append(el("span", "badge", "bot"));
       chip.append(el("span", "count", gp.rackCount));
       chip.title = gp.hasMelded ? "Heeft uitgelegd" : "Nog niet uitgelegd";
-      chip.append(
-        el(
-          "span",
-          "score",
-          `${p.score} pt${gp.hasMelded ? "" : " · nog niet uitgelegd"}`,
-        ),
-      );
+      chip.append(el("span", "score", `${p.score} pt`));
+      if (!gp.hasMelded)
+        chip.append(el("span", "score unmelded", "· nog niet uitgelegd"));
       bar.append(chip);
     }
     $("pool-count").textContent = `Pot: ${g.poolCount}`;
@@ -391,6 +387,7 @@
     $("btn-play").disabled = !mine || !placed;
     $("btn-draw").disabled = !mine;
     $("btn-draw").textContent = g.poolCount ? "Steen pakken" : "Passen";
+    $("btn-draw").dataset.short = g.poolCount ? "Pak steen" : "Passen";
     $("btn-reset").disabled = !mine;
     $("btn-show-result").classList.toggle("hidden", !g.finished);
     for (const id of ["btn-play", "btn-draw", "btn-reset"])
@@ -572,6 +569,7 @@
 
   function endDrag() {
     if (!drag) return;
+    cancelAnimationFrame(drag.raf);
     drag.ghost?.remove();
     drag.el.classList.remove("dragging");
     clearDropTargets();
@@ -584,26 +582,52 @@
     if (!t) return;
     e.preventDefault();
     const r = t.getBoundingClientRect();
+    const touch = e.pointerType === "touch";
     drag = {
       id: Number(t.dataset.id),
       el: t,
       x0: e.clientX,
       y0: e.clientY,
-      offX: e.clientX - r.left,
-      offY: e.clientY - r.top,
+      x: e.clientX,
+      y: e.clientY,
+      // On touch, show the tile above the finger so it stays visible.
+      offX: touch ? r.width / 2 : e.clientX - r.left,
+      offY: touch ? r.height + 12 : e.clientY - r.top,
       ghost: null,
+      raf: 0,
     };
   });
 
+  // Scroll the board while dragging near its top or bottom edge.
+  function autoScroll() {
+    if (!drag) return;
+    const wrap = $("board-wrap");
+    const r = wrap.getBoundingClientRect();
+    const edge = 36;
+    if (drag.x >= r.left && drag.x <= r.right) {
+      if (drag.y >= r.top && drag.y < r.top + edge) wrap.scrollTop -= 8;
+      else if (drag.y <= r.bottom && drag.y > r.bottom - edge)
+        wrap.scrollTop += 8;
+    }
+    drag.raf = requestAnimationFrame(autoScroll);
+  }
+
   document.addEventListener("pointermove", (e) => {
     if (!drag) return;
+    drag.x = e.clientX;
+    drag.y = e.clientY;
     if (!drag.ghost) {
       if (Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) < 4) return;
       drag.ghost = drag.el.cloneNode(true);
       drag.ghost.classList.add("ghost");
       drag.ghost.classList.remove("draggable", "new-draw");
+      const r = drag.el.getBoundingClientRect();
+      drag.ghost.style.width = `${r.width}px`;
+      drag.ghost.style.height = `${r.height}px`;
+      drag.ghost.style.fontSize = getComputedStyle(drag.el).fontSize;
       document.body.append(drag.ghost);
       drag.el.classList.add("dragging");
+      drag.raf = requestAnimationFrame(autoScroll);
     }
     drag.ghost.style.left = `${e.clientX - drag.offX}px`;
     drag.ghost.style.top = `${e.clientY - drag.offY}px`;
@@ -682,7 +706,11 @@
   function updateFullscreenButtons() {
     for (const b of document.querySelectorAll(".btn-fullscreen")) {
       b.classList.toggle("hidden", !requestFs);
-      b.textContent = isFullscreen() ? "Volledig scherm uit" : "Volledig scherm";
+      b.textContent = isFullscreen()
+        ? "Volledig scherm uit"
+        : "Volledig scherm";
+      b.dataset.short = "⤢";
+      b.title = b.textContent;
     }
   }
 
@@ -755,7 +783,32 @@
   }
 
   socket.on("chatHistory", (msgs) => appendChat(msgs, true));
-  socket.on("chat", (msg) => appendChat([msg], false));
+  socket.on("chat", (msg) => {
+    appendChat([msg], false);
+    const drawer = matchMedia(
+      "(max-width: 800px), (max-height: 500px)",
+    ).matches;
+    if (drawer && !chatOpen() && msg.type === "chat" && msg.playerId !== me()) {
+      unread++;
+      updateUnread();
+    }
+  });
+
+  let unread = 0;
+  const chatOpen = () => document.body.classList.contains("chat-open");
+  function updateUnread() {
+    $("chat-unread").textContent = unread;
+    $("chat-unread").classList.toggle("hidden", !unread);
+  }
+  function setChatOpen(open) {
+    document.body.classList.toggle("chat-open", open);
+    if (!open) return;
+    unread = 0;
+    updateUnread();
+    $("chat-log").scrollTop = $("chat-log").scrollHeight;
+  }
+  $("btn-chat").onclick = () => setChatOpen(!chatOpen());
+  $("btn-chat-close").onclick = () => setChatOpen(false);
 
   $("chat-form").onsubmit = (e) => {
     e.preventDefault();
